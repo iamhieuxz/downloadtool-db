@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Database & Storage Manager</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        tailwind.config = { theme: { extend: { colors: { zinc: { 750: '#2d2d35', 850: '#1f1f24', 950: '#09090b' } } } } }
+    </script>
+</head>
+<body class="bg-zinc-900 text-zinc-100 min-h-screen p-6 font-sans relative">
+    
+    <div id="loadingOverlay" class="fixed inset-0 bg-zinc-950/90 z-50 flex flex-col items-center justify-center transition-opacity duration-300">
+        <svg class="animate-spin h-14 w-14 text-sky-500 mb-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
+        <h2 class="text-2xl font-bold text-zinc-100 tracking-wide">Đang xử lý dữ liệu...</h2>
+    </div>
+
+    <div class="max-w-6xl mx-auto space-y-6">
+        <div class="border-b border-zinc-700 pb-4 flex justify-between items-end">
+            <div>
+                <h1 class="text-3xl font-bold text-sky-500">Database & Storage Center</h1>
+                <p class="text-zinc-400 text-sm mt-1" id="rootPathDisplay">Đường dẫn gốc: Đang tải...</p>
+            </div>
+            <a href="/" class="text-sm bg-zinc-700 hover:bg-zinc-600 px-4 py-2 rounded text-white font-bold transition shadow">🏠 Về trang tải</a>
+        </div>
+        <script>
+            // [BẢO MẬT] Inject auth token
+            window.AUTH_TOKEN = "{{ auth_token|e }}";
+        </script>
+
+        <!-- CẤU HÌNH ĐƯỜNG DẪN GỐC -->
+        <div class="bg-zinc-800 border border-zinc-700 rounded-lg shadow-lg p-5">
+            <h2 class="font-bold text-zinc-100 mb-2">⚙️ Cấu hình Đường dẫn Lưu trữ Gốc (Root Path)</h2>
+            <div class="flex space-x-3">
+                <input type="text" id="rootPathInput" placeholder="Ví dụ: E:\gallery-dl hoặc D:\MediaStore" class="flex-1 bg-zinc-950 border border-zinc-700 rounded px-3 py-2 text-sm text-white outline-none focus:border-sky-500 font-mono">
+                <button id="browseBtn" onclick="openFolderBrowser()" class="bg-zinc-700 hover:bg-zinc-600 text-white px-4 py-2 rounded text-sm font-bold transition shadow flex items-center space-x-1 shrink-0">
+                    <span>📂 Browse...</span>
+                </button>
+                <button onclick="updateRootPath()" class="bg-sky-600 hover:bg-sky-500 text-white px-5 py-2 rounded text-sm font-bold transition shadow shrink-0">Lưu</button>
+            </div>
+        </div>
+
+        <div id="statsSection" class="space-y-6">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div class="bg-zinc-800 border border-zinc-700 p-5 rounded-lg shadow-lg">
+                    <h3 class="text-zinc-400 font-bold text-xs uppercase tracking-wider">Tổng dung lượng</h3>
+                    <p class="text-3xl font-bold text-emerald-400 mt-2" id="statSize">0 MB</p>
+                </div>
+                <div class="bg-zinc-800 border border-zinc-700 p-5 rounded-lg shadow-lg">
+                    <h3 class="text-zinc-400 font-bold text-xs uppercase tracking-wider">Tổng số Tệp</h3>
+                    <p class="text-3xl font-bold text-pink-400 mt-2" id="statFiles">0</p>
+                </div>
+                <div class="bg-zinc-800 border border-zinc-700 p-5 rounded-lg shadow-lg">
+                    <h3 class="text-zinc-400 font-bold text-xs uppercase tracking-wider">Instagram Profiles</h3>
+                    <p class="text-3xl font-bold text-pink-500 mt-2" id="statIgUsers">0</p>
+                </div>
+                <div class="bg-zinc-800 border border-zinc-700 p-5 rounded-lg shadow-lg">
+                    <h3 class="text-zinc-400 font-bold text-xs uppercase tracking-wider">X / Twitter Profiles</h3>
+                    <p class="text-3xl font-bold text-blue-400 mt-2" id="statXUsers">0</p>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="bg-zinc-800 border border-zinc-700 p-5 rounded-lg shadow-lg h-[350px] flex flex-col">
+                    <h3 class="text-sm font-bold text-zinc-300 mb-4">Phân loại Dữ liệu</h3>
+                    <div class="flex-1 relative w-full flex justify-center items-center min-h-0">
+                        <canvas id="typeChart"></canvas>
+                    </div>
+                </div>
+                <div class="bg-zinc-800 border border-zinc-700 p-5 rounded-lg shadow-lg h-[350px] flex flex-col">
+                    <h3 class="text-sm font-bold text-zinc-300 mb-4">Top 5 Thư mục nhiều Media nhất</h3>
+                    <div class="flex-1 relative w-full min-h-0">
+                        <canvas id="topFoldersChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- [MỚI]: KHU VỰC QUẢN LÝ DATABASE VỚI Ô TÌM KIẾM THEO KÝ TỰ -->
+        <div class="bg-zinc-800 border border-zinc-700 rounded-lg shadow-lg overflow-hidden p-5 space-y-4">
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-zinc-700 pb-3">
+                <div class="flex items-center space-x-2">
+                    <h2 class="font-bold text-zinc-100 flex items-center space-x-2">
+                        <span>🗄️️ Quản lý Tài khoản trong Database</span>
+                    </h2>
+                    <span id="accountCountBadge" class="text-xs bg-zinc-900 border border-zinc-700 text-sky-400 px-2 py-0.5 rounded font-mono font-bold">0 accounts</span>
+                </div>
+                
+                <!-- Ô tìm kiếm realtime theo ký tự -->
+                <div class="relative w-full sm:w-80">
+                    <input 
+                        type="text" 
+                        id="dbSearchInput" 
+                        oninput="filterDbAccounts()" 
+                        placeholder="🔍 Tìm kiếm theo ký tự (username, platform)..." 
+                        class="w-full bg-zinc-950 border border-zinc-700 rounded px-3 py-1.5 text-sm text-white placeholder-zinc-500 outline-none focus:border-sky-500 transition shadow-inner font-mono"
+                    >
+                    <button 
+                        onclick="clearDbSearch()" 
+                        id="clearSearchBtn" 
+                        class="hidden absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-zinc-400 hover:text-white"
+                        title="Xóa tìm kiếm"
+                    >✖</button>
+                </div>
+            </div>
+            
+            <div class="overflow-x-auto max-h-[350px]">
+                <table class="w-full text-left text-sm">
+                    <thead class="bg-zinc-900 text-zinc-400 sticky top-0 shadow">
+                        <tr>
+                            <th class="px-4 py-3 font-bold">Nền tảng</th>
+                            <th class="px-4 py-3 font-bold">Username</th>
+                            <th class="px-4 py-3 font-bold">Trạng thái</th>
+                            <th class="px-4 py-3 font-bold text-right">Hành động</th>
+                        </tr>
+                    </thead>
+                    <tbody id="dbAccountsBody" class="divide-y divide-zinc-700/50"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Trình Quản Lý Thư Mục (Explorer) -->
+        <div class="bg-zinc-800 border border-zinc-700 rounded-lg shadow-lg overflow-hidden">
+            <div class="bg-zinc-950 px-5 py-3 border-b border-zinc-700 flex flex-col md:flex-row justify-between items-center gap-3">
+                <div id="breadcrumb" class="text-sm flex items-center space-x-2 bg-zinc-900 px-3 py-1.5 rounded border border-zinc-800"></div>
+                <div class="text-sm flex items-center space-x-2">
+                    <span class="text-zinc-400">Sắp xếp:</span>
+                    <select id="sortSelect" onchange="renderTable()" class="bg-zinc-800 border border-zinc-600 text-white text-xs rounded px-3 py-1 outline-none">
+                        <option value="mtime">Mới tải (Gần đây)</option>
+                        <option value="name">Tên A-Z</option>
+                        <option value="size">Dung lượng</option>
+                    </select>
+                </div>
+            </div>
+            <div class="overflow-x-auto max-h-[600px]">
+                <table class="w-full text-left text-sm">
+                    <thead class="bg-zinc-900 text-zinc-400 sticky top-0 shadow z-10">
+                        <tr>
+                            <th class="px-5 py-4 font-bold w-1/3">Tên Tệp / Thư Mục</th>
+                            <th class="px-5 py-4 font-bold">Dung lượng</th>
+                            <th class="px-5 py-4 font-bold">Cập nhật lúc</th>
+                            <th class="px-5 py-4 font-bold text-right">Hành động</th>
+                        </tr>
+                    </thead>
+                    <tbody id="folderTableBody" class="divide-y divide-zinc-700/50"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    <script src="/static/db_manager.js?v=search_mode_v1"></script>
+</body>
+</html>

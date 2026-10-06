@@ -1,0 +1,13 @@
+# Web framework
+fastapi>=0.110.0
+uvicorn[standard]>=0.27.0
+pydantic>=2.0.0
+python-multipart>=0.0.9
+
+# External CLI tools (cần cài qua pip hoặc system package manager)
+# gallery-dl>=1.27.0
+# yt-dlp>=2024.3.10
+
+# Optional: dev tools
+# pytest>=8.0.0
+# pytest-asyncio>=0.23.0
